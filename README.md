@@ -71,7 +71,11 @@ brew install --cask bocah-timer
 **npm / npx** (after publishing the package in `npm/`):
 
 ```bash
-npx bocah-timer          # or: npm install -g bocah-timer && bocah-timer
+npm install -g bocah-timer   # postinstall downloads + installs the app
+bocah-timer                  # launch it (installs first if missing)
+
+# or one-shot, no global install:
+npx bocah-timer
 ```
 
 Homebrew and the terminal installers all avoid the browser quarantine flag, so

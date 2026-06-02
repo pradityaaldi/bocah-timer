@@ -3,7 +3,11 @@
   "version": "0.1.0",
   "description": "Installer for Bocah Timer — fullscreen countdown overlay timer for macOS",
   "bin": {
-    "bocah-timer": "install.js"
+    "bocah-timer": "bin.js"
+  },
+  "files": ["install.js", "bin.js"],
+  "scripts": {
+    "postinstall": "node install.js"
   },
   "os": ["darwin"],
   "keywords": ["macos", "timer", "countdown", "overlay", "tauri"],
