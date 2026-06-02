@@ -14,6 +14,10 @@
     "core:webview:allow-create-webview-window",
     "autostart:allow-enable",
     "autostart:allow-disable",
-    "autostart:allow-is-enabled"
+    "autostart:allow-is-enabled",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://pradityaaldi.github.io/*" }, { "url": "https://pradityaaldi.github.io" }]
+    }
   ]
 }

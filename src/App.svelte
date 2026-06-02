@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { openUrl } from "@tauri-apps/plugin-opener";
   import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
   import { onMount } from "svelte";
 
@@ -27,9 +28,10 @@
   });
 
   // --- timer input ---
+  let hours = $state(0);
   let minutes = $state(25);
   let seconds = $state(0);
-  let label = $state(localStorage.getItem("lastLabel") || "");
+  let label = $state("");
 
   // --- live state from backend ---
   let running = $state(false);
@@ -37,6 +39,7 @@
   let autostart = $state(false);
   let showSettings = $state(false);
   let shown = $state(false); // popover enter/exit animation
+  let goalInput = $state(null); // ref to the goal text input for auto-focus
 
   const fmt = (s) => {
     const m = Math.floor(s / 60);
@@ -70,14 +73,23 @@
     // popover enter animation when the window gains focus (shown by the tray)
     const win = getCurrentWindow();
     if (await win.isFocused().catch(() => false)) shown = true;
-    win.onFocusChanged(({ payload: focused }) => {
-      if (focused) shown = true;
+    win.onFocusChanged(async ({ payload: focused }) => {
+      if (!focused) return;
+      shown = true;
+      // each time the popover opens: empty goal input when idle, show goal while running
+      const s = await invoke("get_state").catch(() => null);
+      const isRunning = !!(s && s.running);
+      label = isRunning ? s.label : "";
+      // auto-focus the goal input when idle
+      if (!isRunning && !showSettings) {
+        requestAnimationFrame(() => goalInput?.focus());
+      }
     });
 
     // exit animation, then actually hide the native window
     await listen("anim-hide", () => {
       shown = false;
-      setTimeout(() => invoke("hide_window"), 170);
+      setTimeout(() => invoke("hide_window"), 280);
     });
 
     // Esc hides the popover window (with animation)
@@ -88,16 +100,15 @@
           showSettings = false;
         } else {
           shown = false;
-          setTimeout(() => invoke("hide_window"), 170);
+          setTimeout(() => invoke("hide_window"), 280);
         }
       }
     });
   });
 
   async function start() {
-    const total = Math.max(1, minutes * 60 + seconds);
+    const total = Math.max(1, hours * 3600 + minutes * 60 + seconds);
     const goal = label.trim();
-    localStorage.setItem("lastLabel", goal);
     await invoke("start_timer", {
       durationSecs: total,
       label: goal,
@@ -136,6 +147,12 @@
       <span class="brand-name">TIMER</span>
       <span class="brand-by">by praditya</span>
     </div>
+    <div class="actions">
+    <button class="icon" onclick={() => openUrl("https://pradityaaldi.github.io")} title="GitHub">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 .5C5.73.5.5 5.73.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2c-3.2.7-3.87-1.54-3.87-1.54-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.23-1.28-5.23-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.43-2.69 5.41-5.25 5.69.41.36.78 1.06.78 2.14v3.17c0 .31.21.68.8.56A10.52 10.52 0 0 0 23.5 12C23.5 5.73 18.27.5 12 .5z" />
+      </svg>
+    </button>
     <button class="icon" onclick={() => (showSettings = !showSettings)} title="Settings">
       {#if showSettings}
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -147,6 +164,7 @@
         </svg>
       {/if}
     </button>
+    </div>
   </header>
 
   <div class="body">
@@ -191,11 +209,16 @@
           type="text"
           placeholder="Tujuan (mis. habis ini mandi)"
           bind:value={label}
+          bind:this={goalInput}
           maxlength="80"
         />
         <div class="inputs">
           <label>
-            <input type="number" min="0" max="999" bind:value={minutes} />
+            <input type="number" min="0" max="99" bind:value={hours} />
+            <span>jam</span>
+          </label>
+          <label>
+            <input type="number" min="0" max="59" bind:value={minutes} />
             <span>min</span>
           </label>
           <label>
@@ -234,13 +257,13 @@
     position: relative;
     transform: scale(0);
     transform-origin: top center;
-    /* exit: quick clean shrink */
-    transition: transform 0.16s cubic-bezier(0.4, 0, 1, 1);
+    /* exit: smooth shrink */
+    transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .pop.shown {
     transform: scale(1);
-    /* enter: scale-up with a soft overshoot */
-    transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+    /* enter: graceful scale-up with a soft overshoot */
+    transition: transform 0.42s cubic-bezier(0.22, 1.3, 0.36, 1);
   }
   /* WARP-style curved notch that points up at the tray icon */
   .notch {
@@ -300,6 +323,11 @@
     margin: 4px 0 22px;
     color: #f24b22;
   }
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
   .icon {
     background: none;
     border: none;
@@ -326,13 +354,26 @@
     background: #16161c;
     border: 1px solid #2a2a33;
     color: #f4f4f5;
-    padding: 9px 11px;
+    padding: 11px 12px;
     border-radius: 8px;
-    font-size: 13px;
+    font-size: 16px;
     text-align: center;
     margin-bottom: 16px;
   }
   .goal-input::placeholder { color: #52525b; }
+  .goal-input:focus,
+  .inputs input:focus,
+  .settings input[type="text"]:focus {
+    outline: none;
+    border-color: #f24b22;
+    box-shadow: 0 0 0 2px rgba(242, 75, 34, 0.18);
+  }
+  .primary:focus-visible,
+  .icon:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(242, 75, 34, 0.5);
+    border-radius: 8px;
+  }
   .goal {
     font-size: 14px;
     color: #f4f4f5;
@@ -341,19 +382,20 @@
   }
   .inputs {
     display: flex;
-    gap: 12px;
-    justify-content: center;
+    gap: 10px;
     margin-bottom: 18px;
   }
   .inputs label {
+    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 4px;
   }
   .inputs input {
-    width: 72px;
-    font-size: 30px;
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 28px;
     text-align: center;
     background: #16161c;
     border: 1px solid #2a2a33;
@@ -361,6 +403,12 @@
     padding: 8px 4px;
     border-radius: 8px;
     -moz-appearance: textfield;
+    appearance: textfield;
+  }
+  .inputs input::-webkit-outer-spin-button,
+  .inputs input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
   }
   .inputs span { font-size: 11px; color: #71717a; text-transform: uppercase; }
 
@@ -377,16 +425,16 @@
     width: 100%;
     padding: 11px;
     font-size: 14px;
-    font-weight: 600;
-    background: #d4af5a;
-    color: #0b0b0f;
+    font-weight: 700;
+    background: #2a2a31;
+    color: #e8e8ee;
     border: none;
     border-radius: 8px;
     cursor: pointer;
   }
-  .primary:hover { background: #e0bf72; }
-  .primary.danger { background: #3a3a44; color: #f4f4f5; }
-  .primary.danger:hover { background: #4a4a55; }
+  .primary:hover { background: #34343d; }
+  .primary.danger { background: #a85450; color: #fff; }
+  .primary.danger:hover { background: #b86460; }
 
   .settings { display: flex; flex-direction: column; gap: 12px; }
   .settings label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: #a1a1aa; }
