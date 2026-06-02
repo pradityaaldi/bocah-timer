@@ -1,6 +1,6 @@
 {
   "name": "bocah-timer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Installer for Bocah Timer — fullscreen countdown overlay timer for macOS",
   "bin": {
     "bocah-timer": "bin.js"
