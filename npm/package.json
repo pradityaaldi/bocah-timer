@@ -14,7 +14,7 @@
   "homepage": "https://github.com/pradityaaldi/bocah-timer",
   "repository": {
     "type": "git",
-    "url": "https://github.com/pradityaaldi/bocah-timer.git"
+    "url": "git+https://github.com/pradityaaldi/bocah-timer.git"
   },
   "license": "MIT"
 }
