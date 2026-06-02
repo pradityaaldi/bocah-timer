@@ -1,0 +1,16 @@
+{
+  "name": "bocah-timer",
+  "version": "0.1.0",
+  "description": "Installer for Bocah Timer — fullscreen countdown overlay timer for macOS",
+  "bin": {
+    "bocah-timer": "install.js"
+  },
+  "os": ["darwin"],
+  "keywords": ["macos", "timer", "countdown", "overlay", "tauri"],
+  "homepage": "https://github.com/pradityaaldi/bocah-timer",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pradityaaldi/bocah-timer.git"
+  },
+  "license": "MIT"
+}

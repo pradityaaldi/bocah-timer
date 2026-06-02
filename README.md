@@ -61,6 +61,22 @@ curl -fsSL https://raw.githubusercontent.com/pradityaaldi/bocah-timer/main/insta
 This downloads the latest `.app`, strips quarantine, drops it in
 `/Applications`, and launches it — no warning, $0.
 
+**Homebrew:**
+
+```bash
+brew tap pradityaaldi/bocah-timer https://github.com/pradityaaldi/bocah-timer
+brew install --cask bocah-timer
+```
+
+**npm / npx** (after publishing the package in `npm/`):
+
+```bash
+npx bocah-timer          # or: npm install -g bocah-timer && bocah-timer
+```
+
+Homebrew and the terminal installers all avoid the browser quarantine flag, so
+**no Gatekeeper warning** appears.
+
 ### If you downloaded the `.dmg` from a browser
 
 macOS shows *"Bocah Timer cannot be opened because the developer cannot be
