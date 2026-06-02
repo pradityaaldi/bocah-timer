@@ -35,9 +35,45 @@ Output:
 - `.app`: `src-tauri/target/universal-apple-darwin/release/bundle/macos/Nice Countdown.app`
 - `.dmg`: `src-tauri/target/universal-apple-darwin/release/bundle/dmg/`
 
-> Unsigned build. First launch: right-click the app → **Open**, or
-> `xattr -dr com.apple.quarantine "Nice Countdown.app"`. For distribution,
-> add an Apple Developer signing identity + notarization.
+> On a Mac whose default `cargo` is not rustup-managed (e.g. MacPorts/Homebrew
+> Rust without the aarch64 std), prefix with the rustup toolchain:
+> `PATH="$HOME/.cargo/bin:$PATH" bun run app:build`.
+
+## Releases (GitHub Actions)
+
+`.github/workflows/build.yml` builds the universal app on `macos-latest` and
+**publishes a GitHub Release automatically** on every push to `main` (release
+`Nice Countdown v<version>`, version read from `tauri.conf.json`). The `.dmg`
+and `.app.tar.gz` are attached. Bump `version` in `package.json` +
+`src-tauri/tauri.conf.json` to cut a new release.
+
+## Installing (Gatekeeper)
+
+The build is **unsigned**, so on first launch macOS shows
+*"Nice Countdown cannot be opened because the developer cannot be verified."*
+This is expected for any app without a paid Apple Developer ID. To open:
+
+```bash
+# easiest — clear the quarantine flag, then open normally
+xattr -dr com.apple.quarantine "/Applications/Nice Countdown.app"
+```
+
+or **right-click the app → Open → Open**, or
+**System Settings → Privacy & Security → Open Anyway**.
+
+### Remove the warning entirely (optional)
+
+Sign + notarize with an Apple Developer ID ($99/yr). Add these repo secrets and
+the CI build signs automatically (no code change needed):
+
+| Secret | What |
+| --- | --- |
+| `APPLE_CERTIFICATE` | base64 of your Developer ID `.p12` |
+| `APPLE_CERTIFICATE_PASSWORD` | `.p12` password |
+| `APPLE_SIGNING_IDENTITY` | e.g. `Developer ID Application: Name (TEAMID)` |
+| `APPLE_ID` | Apple ID email |
+| `APPLE_PASSWORD` | app-specific password |
+| `APPLE_TEAM_ID` | 10-char team id |
 
 ## How the overlay works
 
