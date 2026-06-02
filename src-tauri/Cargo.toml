@@ -1,13 +1,13 @@
 [package]
-name = "nice-countdown"
+name = "bocah-timer"
 version = "0.1.0"
-description = "Fullscreen countdown overlay for macOS"
-authors = ["you"]
+description = "Bocah Timer — fullscreen countdown overlay for macOS"
+authors = ["praditya"]
 edition = "2021"
 rust-version = "1.77"
 
 [lib]
-name = "nice_countdown_lib"
+name = "bocah_timer_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

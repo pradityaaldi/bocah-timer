@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    nice_countdown_lib::run()
+    bocah_timer_lib::run()
 }

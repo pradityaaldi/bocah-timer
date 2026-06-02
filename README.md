@@ -1,4 +1,4 @@
-# Nice Countdown
+# Bocah Timer
 
 Menu-bar countdown timer for macOS. When the countdown ends, a translucent
 fullscreen overlay covers the main display (above the menu bar and Dock, across
@@ -32,7 +32,7 @@ bun run app:build
 
 Output:
 
-- `.app`: `src-tauri/target/universal-apple-darwin/release/bundle/macos/Nice Countdown.app`
+- `.app`: `src-tauri/target/universal-apple-darwin/release/bundle/macos/Bocah Timer.app`
 - `.dmg`: `src-tauri/target/universal-apple-darwin/release/bundle/dmg/`
 
 > On a Mac whose default `cargo` is not rustup-managed (e.g. MacPorts/Homebrew
@@ -43,19 +43,19 @@ Output:
 
 `.github/workflows/build.yml` builds the universal app on `macos-latest` and
 **publishes a GitHub Release automatically** on every push to `main` (release
-`Nice Countdown v<version>`, version read from `tauri.conf.json`). The `.dmg`
+`Bocah Timer v<version>`, version read from `tauri.conf.json`). The `.dmg`
 and `.app.tar.gz` are attached. Bump `version` in `package.json` +
 `src-tauri/tauri.conf.json` to cut a new release.
 
 ## Installing (Gatekeeper)
 
 The build is **unsigned**, so on first launch macOS shows
-*"Nice Countdown cannot be opened because the developer cannot be verified."*
+*"Bocah Timer cannot be opened because the developer cannot be verified."*
 This is expected for any app without a paid Apple Developer ID. To open:
 
 ```bash
 # easiest — clear the quarantine flag, then open normally
-xattr -dr com.apple.quarantine "/Applications/Nice Countdown.app"
+xattr -dr com.apple.quarantine "/Applications/Bocah Timer.app"
 ```
 
 or **right-click the app → Open → Open**, or

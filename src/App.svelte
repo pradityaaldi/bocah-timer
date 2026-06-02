@@ -204,7 +204,7 @@
   <div class="card">
   <header bind:clientHeight={headerH}>
     <div class="brand">
-      <span class="brand-name">TIMER</span>
+      <span class="brand-name">BOCAH TIMER</span>
       <span class="brand-by">by praditya</span>
     </div>
     <div class="actions">
@@ -231,7 +231,7 @@
   <div class="track" class:to-settings={showSettings}>
     <div class="view" bind:clientHeight={th}>
     <section class="timer">
-      <div class="hero">TIMER</div>
+      <div class="hero">BOCAH TIMER</div>
       {#if running}
         {#if label}<p class="goal">{label}</p>{/if}
         <div class="countdown">{fmt(remaining)}</div>
@@ -455,9 +455,10 @@
   }
   .hero {
     text-align: center;
-    font-size: 36px;
+    font-size: 30px;
     font-weight: 800;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
     margin: 4px 0 22px;
     color: #f24b22;
   }

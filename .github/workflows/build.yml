@@ -12,6 +12,10 @@ permissions:
 jobs:
   release:
     runs-on: macos-latest
+    # only enable Apple signing when the certificate secret is actually set;
+    # otherwise tauri tries to import an empty cert and the build fails.
+    env:
+      HAS_SIGNING: ${{ secrets.APPLE_CERTIFICATE != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -31,28 +35,35 @@ jobs:
       - name: Install frontend deps
         run: bun install
 
+      # Sign + notarize only if Apple Developer secrets are configured.
+      # Without these, the build stays unsigned (and succeeds).
+      - name: Configure Apple signing
+        if: env.HAS_SIGNING == 'true'
+        run: |
+          {
+            echo "APPLE_CERTIFICATE<<__EOF__"
+            echo "${{ secrets.APPLE_CERTIFICATE }}"
+            echo "__EOF__"
+            echo "APPLE_CERTIFICATE_PASSWORD=${{ secrets.APPLE_CERTIFICATE_PASSWORD }}"
+            echo "APPLE_SIGNING_IDENTITY=${{ secrets.APPLE_SIGNING_IDENTITY }}"
+            echo "APPLE_ID=${{ secrets.APPLE_ID }}"
+            echo "APPLE_PASSWORD=${{ secrets.APPLE_PASSWORD }}"
+            echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}"
+          } >> "$GITHUB_ENV"
+
       - name: Build + publish release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Optional: set these repo secrets to SIGN + NOTARIZE and remove the
-          # "developer cannot be verified" Gatekeeper warning. Needs a paid
-          # Apple Developer account. Leave unset for an unsigned build.
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tagName: app-v__VERSION__
-          releaseName: "Nice Countdown v__VERSION__"
+          releaseName: "Bocah Timer v__VERSION__"
           releaseBody: |
             Universal macOS build (Intel + Apple Silicon).
 
             **Unsigned build** — on first launch macOS shows
             "developer cannot be verified". To open:
-            `xattr -dr com.apple.quarantine "/Applications/Nice Countdown.app"`
+            `xattr -dr com.apple.quarantine "/Applications/Bocah Timer.app"`
             or right-click the app → Open. See the README for details.
           releaseDraft: false
           prerelease: false
