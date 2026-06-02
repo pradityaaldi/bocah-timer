@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use tauri::{
     menu::{Menu, MenuItem},
-    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder,
 };
 use tauri_plugin_autostart::MacosLauncher;
@@ -50,6 +50,32 @@ struct AppState {
     inner: Mutex<Inner>,
 }
 
+// Holds the menu-bar tray icon so the countdown loop can update its title.
+struct TrayState {
+    tray: Mutex<Option<TrayIcon>>,
+}
+
+// Format seconds as the live menu-bar label: m:ss, or h:mm:ss past an hour.
+fn fmt_clock(secs: u32) -> String {
+    let h = secs / 3600;
+    let m = (secs % 3600) / 60;
+    let s = secs % 60;
+    if h > 0 {
+        format!("{h}:{m:02}:{s:02}")
+    } else {
+        format!("{m}:{s:02}")
+    }
+}
+
+// Set the tray title to `text`, or clear it when None.
+fn set_tray_title(app: &AppHandle, text: Option<String>) {
+    if let Some(ts) = app.try_state::<TrayState>() {
+        if let Some(tray) = ts.tray.lock().unwrap().as_ref() {
+            let _ = tray.set_title(text);
+        }
+    }
+}
+
 #[derive(serde::Serialize)]
 struct OverlayConfig {
     label: String,
@@ -85,12 +111,14 @@ fn run_countdown(app: AppHandle, gen: u64) {
             g.remaining
         };
         let _ = app.emit("tick", rem);
+        set_tray_title(&app, Some(fmt_clock(rem)));
         if rem == 0 {
             {
                 let mut g = state.inner.lock().unwrap();
                 g.running = false;
             }
             let _ = app.emit("finished", ());
+            set_tray_title(&app, None);
             show_overlay(app.clone());
             return;
         }
@@ -107,6 +135,7 @@ fn spawn_timer(app: &AppHandle, duration: u32) {
         g.duration = duration;
         g.generation
     };
+    set_tray_title(app, Some(fmt_clock(duration)));
     let a = app.clone();
     std::thread::spawn(move || run_countdown(a, gen));
 }
@@ -135,6 +164,7 @@ fn stop_timer(app: AppHandle, state: State<AppState>) {
         g.running = false;
         g.remaining = 0;
     }
+    set_tray_title(&app, None);
     let _ = app.emit("stopped", ());
 }
 
@@ -304,7 +334,7 @@ pub fn run() {
             )?;
 
             let tray_icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))?;
-            let _tray = TrayIconBuilder::new()
+            let tray = TrayIconBuilder::new()
                 .icon(tray_icon)
                 .icon_as_template(true)
                 .menu(&menu)
@@ -326,6 +356,10 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+
+            app.manage(TrayState {
+                tray: Mutex::new(Some(tray)),
+            });
 
             Ok(())
         })
