@@ -12,22 +12,26 @@ use tauri_plugin_positioner::{Position, WindowExt};
 // ---- settings sent from the popover ----
 #[derive(Clone, serde::Deserialize, serde::Serialize)]
 struct Settings {
-    message: String,
     color: String,
     opacity: f64,
     #[serde(rename = "loop")]
     looping: bool,
     sound: bool,
+    #[serde(rename = "soundId", default)]
+    sound_id: String,
+    #[serde(rename = "soundData", default)]
+    sound_data: Option<String>,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Settings {
-            message: "Time's up!".into(),
             color: "#0b0b0f".into(),
             opacity: 0.78,
             looping: false,
             sound: true,
+            sound_id: "beep".into(),
+            sound_data: None,
         }
     }
 }
@@ -48,11 +52,14 @@ struct AppState {
 
 #[derive(serde::Serialize)]
 struct OverlayConfig {
-    message: String,
     label: String,
     color: String,
     opacity: f64,
     sound: bool,
+    #[serde(rename = "soundId")]
+    sound_id: String,
+    #[serde(rename = "soundData")]
+    sound_data: Option<String>,
 }
 
 #[derive(serde::Serialize)]
@@ -151,11 +158,12 @@ fn dismiss_overlay(app: AppHandle, state: State<AppState>) {
 fn get_overlay_config(state: State<AppState>) -> OverlayConfig {
     let g = state.inner.lock().unwrap();
     OverlayConfig {
-        message: g.settings.message.clone(),
         label: g.label.clone(),
         color: g.settings.color.clone(),
         opacity: g.settings.opacity,
         sound: g.settings.sound,
+        sound_id: g.settings.sound_id.clone(),
+        sound_data: g.settings.sound_data.clone(),
     }
 }
 

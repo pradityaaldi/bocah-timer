@@ -14,7 +14,8 @@
     "@fontsource/plus-jakarta-sans": "^5.2.8",
     "@tauri-apps/api": "^2.1.1",
     "@tauri-apps/plugin-autostart": "^2.0.1",
-    "@tauri-apps/plugin-opener": "^2.5.4"
+    "@tauri-apps/plugin-opener": "^2.5.4",
+    "canvas-confetti": "^1.9.4"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^4.0.0",

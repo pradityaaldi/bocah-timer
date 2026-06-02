@@ -2,16 +2,20 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { LogicalSize } from "@tauri-apps/api/dpi";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
   import { onMount } from "svelte";
+  import { PRESETS, previewAlarm } from "./lib/sounds.js";
 
   const DEFAULTS = {
-    message: "Time's up!",
     color: "#0b0b0f",
     opacity: 0.78,
     loop: false,
     sound: true,
+    soundId: "beep",
+    soundData: null,
+    soundName: "",
   };
 
   // --- persisted settings ---
@@ -27,6 +31,45 @@
     localStorage.setItem("settings", JSON.stringify(settings));
   });
 
+  // overlay color quick-pick presets
+  const presets = ["#0b0b0f", "#18191a", "#0f1729", "#1e1422", "#0f1f17", "#2a1116"];
+
+  // --- alarm sound selection ---
+  let previewing = $state(false);
+  let previewStop = null;
+
+  function selectPreset(id) {
+    settings.soundId = id;
+  }
+
+  function onPickSound(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      settings.soundData = reader.result;
+      settings.soundId = "custom";
+      settings.soundName = file.name;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  }
+
+  function testSound() {
+    if (previewing) {
+      previewStop?.();
+      previewStop = null;
+      previewing = false;
+      return;
+    }
+    previewing = true;
+    previewStop = previewAlarm({ id: settings.soundId, custom: settings.soundData });
+    setTimeout(() => {
+      previewing = false;
+      previewStop = null;
+    }, 4000);
+  }
+
   // --- timer input ---
   let hours = $state(0);
   let minutes = $state(25);
@@ -40,6 +83,20 @@
   let showSettings = $state(false);
   let shown = $state(false); // popover enter/exit animation
   let goalInput = $state(null); // ref to the goal text input for auto-focus
+  let th = $state(0); // timer view height
+  let sh = $state(0); // settings view height
+  let headerH = $state(0); // header bar height
+
+  // resize the native window to fit the active page (main / settings)
+  $effect(() => {
+    const view = showSettings ? sh : th;
+    if (!headerH || !view) return;
+    // main padding (13 top + 24 bottom) + card border (2) + header + active view
+    const h = Math.ceil(39 + headerH + view);
+    getCurrentWindow()
+      .setSize(new LogicalSize(340, h))
+      .catch(() => {});
+  });
 
   const fmt = (s) => {
     const m = Math.floor(s / 60);
@@ -89,7 +146,10 @@
     // exit animation, then actually hide the native window
     await listen("anim-hide", () => {
       shown = false;
-      setTimeout(() => invoke("hide_window"), 280);
+      setTimeout(() => {
+        invoke("hide_window");
+        showSettings = false; // reset to main page while hidden
+      }, 280);
     });
 
     // Esc hides the popover window (with animation)
@@ -142,7 +202,7 @@
 <main>
   <div class="pop" class:shown>
   <div class="card">
-  <header>
+  <header bind:clientHeight={headerH}>
     <div class="brand">
       <span class="brand-name">TIMER</span>
       <span class="brand-by">by praditya</span>
@@ -167,35 +227,9 @@
     </div>
   </header>
 
-  <div class="body">
-  {#if showSettings}
-    <section class="settings">
-      <label>
-        <span>Overlay message</span>
-        <input type="text" bind:value={settings.message} maxlength="80" />
-      </label>
-      <label class="row">
-        <span>Overlay color</span>
-        <input type="color" bind:value={settings.color} />
-      </label>
-      <label>
-        <span>Opacity · {Math.round(settings.opacity * 100)}%</span>
-        <input type="range" min="0.3" max="1" step="0.01" bind:value={settings.opacity} />
-      </label>
-      <label class="row">
-        <span>Loop / repeat</span>
-        <input type="checkbox" bind:checked={settings.loop} />
-      </label>
-      <label class="row">
-        <span>Alarm sound</span>
-        <input type="checkbox" bind:checked={settings.sound} />
-      </label>
-      <label class="row">
-        <span>Start at login</span>
-        <input type="checkbox" checked={autostart} onchange={toggleAutostart} />
-      </label>
-    </section>
-  {:else}
+  <div class="viewport" style="height:{showSettings ? sh : th}px">
+  <div class="track" class:to-settings={showSettings}>
+    <div class="view" bind:clientHeight={th}>
     <section class="timer">
       <div class="hero">TIMER</div>
       {#if running}
@@ -229,7 +263,95 @@
         <button class="primary" onclick={start}>Start</button>
       {/if}
     </section>
-  {/if}
+    </div>
+    <div class="view" bind:clientHeight={sh}>
+    <section class="settings">
+      <p class="group-label">Overlay</p>
+
+      <div class="field">
+        <div class="s-row">
+          <span class="s-label">Color</span>
+          <input
+            class="text-input hex-input mono"
+            type="text"
+            bind:value={settings.color}
+            maxlength="7"
+            spellcheck="false"
+            autocapitalize="off"
+            aria-label="Overlay color hex"
+          />
+        </div>
+        <div class="swatches">
+          {#each presets as c}
+            <button
+              class="chip"
+              class:sel={settings.color.toLowerCase() === c}
+              style="background:{c}"
+              aria-label={c}
+              onclick={() => (settings.color = c)}
+            ></button>
+          {/each}
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="s-row">
+          <span class="s-label">Opacity</span>
+          <span class="s-val">{Math.round(settings.opacity * 100)}%</span>
+        </div>
+        <input
+          class="range"
+          type="range"
+          min="0.3"
+          max="1"
+          step="0.01"
+          bind:value={settings.opacity}
+        />
+      </div>
+
+      <p class="group-label">Behavior</p>
+
+      <label class="setting toggle">
+        <span class="s-label">Loop / repeat</span>
+        <input type="checkbox" bind:checked={settings.loop} />
+        <span class="switch"></span>
+      </label>
+
+      <label class="setting toggle">
+        <span class="s-label">Alarm sound</span>
+        <input type="checkbox" bind:checked={settings.sound} />
+        <span class="switch"></span>
+      </label>
+
+      {#if settings.sound}
+        <div class="field sound-picker">
+          <div class="sound-list">
+            {#each PRESETS as p}
+              <button
+                class="sound-opt"
+                class:sel={settings.soundId === p.id}
+                onclick={() => selectPreset(p.id)}
+              >{p.name}</button>
+            {/each}
+            <label class="sound-opt custom-opt" class:sel={settings.soundId === "custom"}>
+              {settings.soundId === "custom" && settings.soundName ? settings.soundName : "Custom…"}
+              <input type="file" accept="audio/*" onchange={onPickSound} />
+            </label>
+          </div>
+          <button class="test-btn" onclick={testSound}>
+            {previewing ? "■ Stop" : "▶ Test"}
+          </button>
+        </div>
+      {/if}
+
+      <label class="setting toggle">
+        <span class="s-label">Start at login</span>
+        <input type="checkbox" checked={autostart} onchange={toggleAutostart} />
+        <span class="switch"></span>
+      </label>
+    </section>
+    </div>
+  </div>
   </div>
   </div>
   <svg class="notch" width="60" height="10" viewBox="0 0 60 10" aria-hidden="true">
@@ -311,9 +433,25 @@
     color: #f4f4f5;
     margin-top: 0;
   }
-  .body {
-    padding: 20px 18px 24px;
+  .viewport {
     background: #000;
+    overflow: hidden;
+    transition: height 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .track {
+    display: flex;
+    align-items: flex-start;
+    width: 200%;
+    transform: translateX(0);
+    transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .track.to-settings {
+    transform: translateX(-50%);
+  }
+  .view {
+    width: 50%;
+    box-sizing: border-box;
+    padding: 20px 18px 24px;
   }
   .hero {
     text-align: center;
@@ -436,18 +574,224 @@
   .primary.danger { background: #a85450; color: #fff; }
   .primary.danger:hover { background: #b86460; }
 
-  .settings { display: flex; flex-direction: column; gap: 12px; }
-  .settings label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: #a1a1aa; }
-  .settings label.row { flex-direction: row; align-items: center; justify-content: space-between; }
-  .settings input[type="text"] {
+  .settings {
+    display: flex;
+    flex-direction: column;
+  }
+  .group-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: #6b6b78;
+    margin: 14px 0 4px;
+  }
+  .group-label:first-child {
+    margin-top: 0;
+  }
+  .s-label {
+    font-size: 13px;
+    color: #d4d4dc;
+    font-weight: 500;
+  }
+  .s-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .s-val {
+    font-size: 12px;
+    color: #8a8a96;
+    font-variant-numeric: tabular-nums;
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 11px 0;
+  }
+  .setting {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 0;
+  }
+  .field,
+  .setting {
+    border-top: 1px solid #1c1c22;
+  }
+  .group-label + .field,
+  .group-label + .setting {
+    border-top: none;
+  }
+  .text-input {
     background: #16161c;
     border: 1px solid #2a2a33;
     color: #f4f4f5;
-    padding: 7px 9px;
-    border-radius: 7px;
-    font-size: 13px;
+    padding: 9px 11px;
+    border-radius: 8px;
+    font-size: 14px;
   }
-  .settings input[type="range"] { accent-color: #d4af5a; }
-  .settings input[type="color"] { width: 40px; height: 26px; border: none; background: none; padding: 0; }
-  .settings input[type="checkbox"] { width: 16px; height: 16px; accent-color: #d4af5a; }
+  .text-input::placeholder {
+    color: #52525b;
+  }
+  /* color swatch */
+  .mono {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    letter-spacing: 0.02em;
+  }
+  .swatches {
+    display: flex;
+    gap: 8px;
+  }
+  .chip {
+    position: relative;
+    flex: 1;
+    height: 30px;
+    border-radius: 7px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 0;
+    cursor: pointer;
+    transition: transform 0.12s ease;
+  }
+  .chip:hover {
+    transform: translateY(-1px);
+  }
+  .chip.sel {
+    border-color: #f24b22;
+    box-shadow: 0 0 0 2px rgba(242, 75, 34, 0.35);
+  }
+  .chip:focus-visible {
+    outline: none;
+    border-color: #f24b22;
+  }
+  .hex-input {
+    width: 96px;
+    padding: 6px 9px;
+    font-size: 13px;
+    text-align: right;
+    text-transform: uppercase;
+  }
+  /* alarm sound picker */
+  .sound-picker {
+    gap: 10px;
+    padding-top: 4px;
+  }
+  .sound-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+  .sound-opt {
+    font-size: 12px;
+    font-weight: 500;
+    color: #c4c4cc;
+    background: #16161c;
+    border: 1px solid #2a2a33;
+    border-radius: 999px;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: border-color 0.12s ease, color 0.12s ease;
+  }
+  .sound-opt:hover {
+    color: #fff;
+  }
+  .sound-opt.sel {
+    border-color: #f24b22;
+    color: #fff;
+    box-shadow: 0 0 0 1px rgba(242, 75, 34, 0.4);
+  }
+  .custom-opt {
+    position: relative;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .custom-opt input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    width: 100%;
+    cursor: pointer;
+  }
+  .test-btn {
+    align-self: flex-start;
+    font-size: 12px;
+    font-weight: 600;
+    color: #e8e8ee;
+    background: #2a2a31;
+    border: none;
+    border-radius: 7px;
+    padding: 7px 14px;
+    cursor: pointer;
+  }
+  .test-btn:hover {
+    background: #34343d;
+  }
+  /* opacity range */
+  .range {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 999px;
+    background: #2a2a33;
+    cursor: pointer;
+  }
+  .range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #f24b22;
+    border: 2px solid #18191a;
+    cursor: pointer;
+  }
+  .range:focus-visible {
+    outline: none;
+  }
+  .range:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 3px rgba(242, 75, 34, 0.4);
+  }
+  /* toggle switch */
+  .toggle {
+    cursor: pointer;
+  }
+  .toggle input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  .switch {
+    position: relative;
+    flex: none;
+    width: 38px;
+    height: 22px;
+    border-radius: 999px;
+    background: #3a3a44;
+    transition: background 0.2s ease;
+  }
+  .switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.22s cubic-bezier(0.3, 0.8, 0.3, 1);
+  }
+  .toggle input:checked + .switch {
+    background: #f24b22;
+  }
+  .toggle input:checked + .switch::after {
+    transform: translateX(16px);
+  }
+  .toggle input:focus-visible + .switch {
+    box-shadow: 0 0 0 2px rgba(242, 75, 34, 0.5);
+  }
 </style>
