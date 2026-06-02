@@ -47,14 +47,26 @@ Output:
 and `.app.tar.gz` are attached. Bump `version` in `package.json` +
 `src-tauri/tauri.conf.json` to cut a new release.
 
-## Installing (Gatekeeper)
+## Install (recommended — no Gatekeeper warning, free)
 
-The build is **unsigned**, so on first launch macOS shows
-*"Bocah Timer cannot be opened because the developer cannot be verified."*
-This is expected for any app without a paid Apple Developer ID. To open:
+The build is **unsigned** (Apple notarization needs a paid Developer ID; there
+is no free notarization). But the *"cannot verify developer / malware"* prompt
+only appears for files a **browser** downloads (they get a quarantine flag).
+Install from the **terminal** instead and the prompt never shows:
 
 ```bash
-# easiest — clear the quarantine flag, then open normally
+curl -fsSL https://raw.githubusercontent.com/pradityaaldi/bocah-timer/main/install.sh | bash
+```
+
+This downloads the latest `.app`, strips quarantine, drops it in
+`/Applications`, and launches it — no warning, $0.
+
+### If you downloaded the `.dmg` from a browser
+
+macOS shows *"Bocah Timer cannot be opened because the developer cannot be
+verified."* — expected for an unsigned app. To open:
+
+```bash
 xattr -dr com.apple.quarantine "/Applications/Bocah Timer.app"
 ```
 
