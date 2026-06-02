@@ -256,6 +256,15 @@ fn toggle_main(app: &AppHandle) {
     }
 }
 
+// Always reveal the popover under the tray icon (used on app re-launch / Dock reopen).
+fn show_main(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.move_window(Position::TrayCenter);
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+}
+
 #[tauri::command]
 fn hide_window(app: AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
@@ -344,6 +353,15 @@ pub fn run() {
             get_overlay_config,
             get_state
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            // Re-launching the app (Spotlight + Enter, Dock, `open`) fires Reopen on macOS.
+            // Show the menu-bar popover instead of doing nothing.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = event {
+                show_main(app);
+            }
+            let _ = (app, &event);
+        });
 }
